@@ -1,78 +1,54 @@
 #include "client.h"
-#include <QtNetwork/QHostAddress>
+#include <QDebug>
 
-Client::Client(QObject *parent) : QObject(parent)
-{
-    qDebug() << QString::fromUtf8("Instancie un objet QTcpSocket");
+// Constructeur de la classe Client
+Client::Client(QObject *parent) : QObject(parent) {
+    // Création d'un objet QTcpSocket
     tcpSocket = new QTcpSocket(this);
-    qDebug() << QString::fromUtf8("Création de la socket et visualisation de l'état de la socket :") << tcpSocket->state();
+    
+    // Connexion des signaux du socket aux slots correspondants
+    connect(tcpSocket, &QTcpSocket::connected, this, &Client::connected);        // Signal 'connected' -> Slot 'connected'
+    connect(tcpSocket, &QTcpSocket::readyRead, this, &Client::readData);          // Signal 'readyRead' -> Slot 'readData'
+    connect(tcpSocket, &QTcpSocket::disconnected, this, &Client::disconnected);  // Signal 'disconnected' -> Slot 'disconnected'
 
-    // Connexions des signaux et slots
-    connect(tcpSocket, &QTcpSocket::connected, this, &Client::estConnectee);
-    connect(tcpSocket, &QTcpSocket::disconnected, this, &Client::estDeconnectee);
-    connect(tcpSocket, QOverload<QAbstractSocket::SocketError>::of(&QTcpSocket::errorOccurred), this, &Client::gestionErreur);
-    connect(tcpSocket, &QTcpSocket::readyRead, this, &Client::recevoir);
+    // Affichage du message dans le terminal pour indiquer la tentative de connexion
+    qDebug() << "Attempting to connect to server...";
+
+    // Tentative de connexion au serveur local (127.0.0.1) sur le port 8000
+    tcpSocket->connectToHost("127.0.0.1", 8000);
 }
 
-Client::~Client()
-{
-    qDebug() << QString::fromUtf8("Ferme la socket");
-    tcpSocket->close();
+// Destructeur de la classe Client
+Client::~Client() {
+    // Libération de la mémoire allouée pour le QTcpSocket
+    tcpSocket->deleteLater();
 }
 
-void Client::demarrer()
-{
-    qDebug() << QString::fromUtf8("Connexion au serveur");
+// Slot appelé lorsque la connexion au serveur est réussie
+void Client::connected() {
+    qDebug() << "Connected to server.";  // Affichage du message de connexion réussie
+    
+    // Création d'un message à envoyer au serveur
+    QByteArray message = "hello";
+    
+    // Envoi du message au serveur via le socket
+    tcpSocket->write(message);
+    tcpSocket->flush();  // Force l'envoi immédiat du message
 
-    QHostAddress serverAddress = QHostAddress::LocalHost;
-    quint16 serverPort = 8000; // Assurez-vous que cela correspond au port utilisé par Netcat
-
-    tcpSocket->connectToHost(serverAddress, serverPort);
-    qDebug() << QString::fromUtf8("État de la connexion de la socket :") << tcpSocket->state();
+    // Affichage du message envoyé dans le terminal
+    qDebug() << "Sent message to server:" << message;
 }
 
-void Client::estConnectee()
-{
-    qDebug() << QString::fromUtf8("Le client est bien connecté au serveur ayant pour adresse :") << this->tcpSocket->peerAddress().toString() << "\n";
-    qDebug() << QString::fromUtf8("et pour port :") << this->tcpSocket->peerPort() << "`\n";
-
-    this->envoyer("Bonjour à vous !");
+// Slot appelé lorsqu'il y a des données à lire dans le socket
+void Client::readData() {
+    // Lecture de toutes les données disponibles dans le socket et conversion en QString
+    QString data = QString::fromUtf8(tcpSocket->readAll());
+    
+    // Affichage du message reçu du serveur dans le terminal
+    qDebug() << "Message received from server:" << data;
 }
 
-void Client::estDeconnectee()
-{
-    qDebug() << QString::fromUtf8("Le client est bien déconnecté");
+// Slot appelé lorsque la connexion avec le serveur est fermée
+void Client::disconnected() {
+    qDebug() << "Disconnected from server.";  // Affichage du message de déconnexion
 }
-
-void Client::gestionErreur(QAbstractSocket::SocketError erreur)
-{
-    qDebug() << QString::fromUtf8("Message d'erreur :") << tcpSocket->errorString();
-}
-
-void Client::recevoir()
-{
-    qDebug() << "Des données ont été reçues : " << tcpSocket->readAll();
-}
-
-void Client::envoyer(QByteArray message)
-{
-    // envoi du message de
-    //QByteArray message("Hello world !\n"); // représente le message de la couche Application
-
-    qint64 ecrits = -1;
-    // Envoie du message
-    ecrits = tcpSocket->write(message);
-    switch(ecrits)
-    {
-    case -1 : /* une erreur ! */
-        qDebug() << QString::fromUtf8("Erreur lors de l’envoi !"); break;
-    default: /* envoi de n octets */
-        qDebug() << QString::fromUtf8("Message envoyé : ") << message;
-        qDebug() << QString::fromUtf8("Octets envoyés : ") << ecrits;
-        qDebug() << QString::fromUtf8("Message envoyé avec succès !");
-    }
-
-
-}
-
-
